@@ -1,4 +1,5 @@
 #include "GuiDateTimeControls.h"
+#include "Templates/GuiThemeStyleFactory.h"
 
 namespace vl
 {
@@ -66,12 +67,39 @@ GuiDatePicker
 				GuiControl::SetText(dateLocale.FormatDate(dateFormat, date));
 			}
 
-			GuiDatePicker::GuiDatePicker(theme::ThemeName themeName)
+			bool GuiDatePicker::IsAltAvailable()
+			{
+				if (nestedAlt)
+				{
+					return alt != L"";
+				}
+				else
+				{
+					return GuiControl::IsAltAvailable();
+				}
+			}
+
+			compositions::IGuiAltActionHost* GuiDatePicker::GetActivatingAltHost()
+			{
+				if (nestedAlt)
+				{
+					return this;
+				}
+				else
+				{
+					return GuiControl::GetActivatingAltHost();
+				}
+			}
+
+			GuiDatePicker::GuiDatePicker(theme::ThemeName themeName, bool _nestedAlt)
 				:GuiControl(themeName)
+				, nestedAlt(_nestedAlt)
 			{
 				commandExecutor = new CommandExecutor(this);
 				SetDateLocale(Locale::UserDefault());
 				SetDate(DateTime::LocalTime());
+				SetAltComposition(boundsComposition);
+				SetAltControl(this, false);
 
 				DateChanged.SetAssociatedComposition(boundsComposition);
 				DateNavigated.SetAssociatedComposition(boundsComposition);
@@ -141,6 +169,16 @@ GuiDatePicker
 GuiDateComboBox
 ***********************************************************************/
 
+			void GuiDateComboBox::BeforeControlTemplateUninstalled_()
+			{
+			}
+
+			void GuiDateComboBox::AfterControlTemplateInstalled_(bool initialize)
+			{
+				auto ct = GetControlTemplateObject(true);
+				datePicker->SetControlTemplate(ct->GetDatePickerTemplate());
+			}
+
 			void GuiDateComboBox::UpdateText()
 			{
 				SetText(datePicker->GetDateLocale().FormatDate(datePicker->GetDateFormat(), selectedDate));
@@ -171,21 +209,22 @@ GuiDateComboBox
 			{
 				selectedDate=datePicker->GetDate();
 				GetSubMenu()->Hide();
-				SelectItem();
 				NotifyUpdateSelectedDate();
 			}
 
-			GuiDateComboBox::GuiDateComboBox(theme::ThemeName themeName, GuiDatePicker* _datePicker)
+			GuiDateComboBox::GuiDateComboBox(theme::ThemeName themeName)
 				:GuiComboBoxBase(themeName)
-				,datePicker(_datePicker)
 			{
 				SelectedDateChanged.SetAssociatedComposition(GetBoundsComposition());
-
+				
+				datePicker = new GuiDatePicker(theme::ThemeName::DatePicker, false);
 				datePicker->DateSelected.AttachMethod(this, &GuiDateComboBox::datePicker_DateSelected);
 				datePicker->DateLocaleChanged.AttachMethod(this, &GuiDateComboBox::datePicker_DateLocaleChanged);
 				datePicker->DateFormatChanged.AttachMethod(this, &GuiDateComboBox::datePicker_DateFormatChanged);
 				datePicker->GetBoundsComposition()->SetAlignmentToParent(Margin(0, 0, 0, 0));
+
 				GetSubMenu()->GetContainerComposition()->AddChild(datePicker->GetBoundsComposition());
+				GetSubMenu()->SetHideOnDeactivateAltHost(false);
 
 				selectedDate=datePicker->GetDate();
 				SubMenuOpeningChanged.AttachMethod(this, &GuiDateComboBox::OnSubMenuOpeningChanged);
@@ -197,7 +236,7 @@ GuiDateComboBox
 			{
 			}
 
-			void GuiDateComboBox::SetFont(const FontProperties& value)
+			void GuiDateComboBox::SetFont(const Nullable<FontProperties>& value)
 			{
 				GuiComboBoxBase::SetFont(value);
 				datePicker->SetFont(value);

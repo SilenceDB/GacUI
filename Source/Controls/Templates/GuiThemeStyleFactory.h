@@ -10,7 +10,6 @@ Interfaces:
 #define VCZH_PRESENTATION_CONTROLS_GUITHEMESTYLEFACTORY
 
 #include "GuiControlTemplates.h"
-#include "GuiCommonTemplates.h"
 
 namespace vl
 {
@@ -72,6 +71,7 @@ namespace vl
 			F(SelectableButtonTemplate,		CheckBox)					\
 			F(SelectableButtonTemplate,		RadioButton)				\
 			F(DatePickerTemplate,			DatePicker)					\
+			F(DateComboBoxTemplate,			DateComboBox)				\
 			F(ScrollTemplate,				HScroll)					\
 			F(ScrollTemplate,				VScroll)					\
 			F(ScrollTemplate,				HTracker)					\
@@ -100,12 +100,14 @@ namespace vl
 			{
 				friend class Theme;
 			protected:
-				ThemeTemplates*														previous = nullptr;
-				ThemeTemplates*														next = nullptr;
+				ThemeTemplates*					previous = nullptr;
+				ThemeTemplates*					next = nullptr;
 
-				controls::GuiControlHost*											GetControlHostForInstance()override;
+				controls::GuiControlHost*		GetControlHostForInstance()override;
 			public:
 				~ThemeTemplates();
+
+				WString							Name;
 
 #define GUI_DEFINE_ITEM_PROPERTY(TEMPLATE, CONTROL) TemplateProperty<templates::Gui##TEMPLATE> CONTROL;
 				GUI_CONTROL_TEMPLATE_TYPES(GUI_DEFINE_ITEM_PROPERTY)
@@ -119,9 +121,8 @@ namespace vl
 			extern void							FinalizeTheme();
 			/// <summary>Register a control template collection object.</summary>
 			/// <returns>Returns true if this operation succeeded.</returns>
-			/// <param name="name">The name of the theme.</param>
 			/// <param name="theme">The control template collection object.</param>
-			extern bool							RegisterTheme(const WString& name, Ptr<ThemeTemplates> theme);
+			extern bool							RegisterTheme(Ptr<ThemeTemplates> theme);
 			/// <summary>Unregister a control template collection object.</summary>
 			/// <returns>The registered object. Returns null if it does not exist.</returns>
 			/// <param name="name">The name of the theme.</param>

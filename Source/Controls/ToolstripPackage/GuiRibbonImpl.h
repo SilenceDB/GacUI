@@ -10,6 +10,7 @@ Interfaces:
 #define VCZH_PRESENTATION_CONTROLS_GUIRIBBONIMPL
 
 #include "../ListControlPackage/GuiListControlItemArrangers.h"
+#include "../../GraphicsComposition/GuiGraphicsResponsiveComposition.h"
 
 namespace vl
 {
@@ -37,7 +38,7 @@ GalleryItemArranger
 					vint										firstIndex = 0;
 
 					void										BeginPlaceItem(bool forMoving, Rect newBounds, vint& newStartIndex)override;
-					void										PlaceItem(bool forMoving, vint index, ItemStyleRecord style, Rect viewBounds, Rect& bounds, Margin& alignmentToParent)override;
+					void										PlaceItem(bool forMoving, bool newCreatedStyle, vint index, ItemStyleRecord style, Rect viewBounds, Rect& bounds, Margin& alignmentToParent)override;
 					bool										IsItemOutOfViewBounds(vint index, ItemStyleRecord style, Rect bounds, Rect viewBounds)override;
 					bool										EndPlaceItem(bool forMoving, Rect newBounds, vint newStartIndex)override;
 					void										InvalidateItemSizeCache()override;
@@ -47,7 +48,7 @@ GalleryItemArranger
 					~GalleryItemArranger();
 
 					vint										FindItem(vint itemIndex, compositions::KeyDirection key)override;
-					bool										EnsureItemVisible(vint itemIndex)override;
+					GuiListControl::EnsureItemVisibleResult		EnsureItemVisible(vint itemIndex)override;
 					Size										GetAdoptedSize(Size expectedSize)override;
 
 					void										ScrollUp();

@@ -103,7 +103,11 @@ GuiMenu
 
 			void GuiMenu::OnDeactivatedAltHost()
 			{
-				Hide();
+				if(hideOnDeactivateAltHost)
+				{
+					Hide();
+				}
+				GuiPopup::OnDeactivatedAltHost();
 			}
 
 			void GuiMenu::MouseClickedOnOtherWindow(GuiWindow* window)
@@ -161,6 +165,16 @@ GuiMenu
 				{
 					return GuiPopup::QueryService(identifier);
 				}
+			}
+			
+			bool GuiMenu::GetHideOnDeactivateAltHost()
+			{
+				return hideOnDeactivateAltHost;
+			}
+
+			void GuiMenu::SetHideOnDeactivateAltHost(bool value)
+			{
+				hideOnDeactivateAltHost = value;
 			}
 
 /***********************************************************************
@@ -243,20 +257,30 @@ GuiMenuButton
 				return button ? button : this;
 			}
 
-			void GuiMenuButton::OpenSubMenuInternal()
+			bool GuiMenuButton::OpenSubMenuInternal()
 			{
-				if(!GetSubMenuOpening())
+				if (!GetSubMenuOpening())
 				{
-					if(ownerMenuService)
+					if (ownerMenuService)
 					{
-						GuiMenu* openingSiblingMenu=ownerMenuService->GetOpeningMenu();
-						if(openingSiblingMenu)
+						GuiMenu* openingSiblingMenu = ownerMenuService->GetOpeningMenu();
+						if (openingSiblingMenu)
 						{
 							openingSiblingMenu->Hide();
 						}
 					}
-					SetSubMenuOpening(true);
+
+					BeforeSubMenuOpening.Execute(GetNotifyEventArguments());
+					if (subMenu)
+					{
+						subMenu->SetClientSize(preferredMenuClientSize);
+						IGuiMenuService::Direction direction = GetSubMenuDirection();
+						subMenu->ShowPopup(GetSubMenuHost(), direction == IGuiMenuService::Horizontal);
+						AfterSubMenuOpening.Execute(GetNotifyEventArguments());
+						return true;
+					}
 				}
+				return false;
 			}
 
 			void GuiMenuButton::OnParentLineChanged()
@@ -273,18 +297,16 @@ GuiMenuButton
 				}
 			}
 
-			bool GuiMenuButton::IsAltAvailable()
-			{
-				return true;
-			}
-
 			compositions::IGuiAltActionHost* GuiMenuButton::GetActivatingAltHost()
 			{
 				if (subMenu)
 				{
 					return subMenu->QueryTypedService<IGuiAltActionHost>();
 				}
-				return 0;
+				else
+				{
+					return GuiSelectableButton::GetActivatingAltHost();
+				}
 			}
 
 			void GuiMenuButton::OnSubMenuWindowOpened(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments)
@@ -314,12 +336,7 @@ GuiMenuButton
 			{
 				if(GetVisuallyEnabled())
 				{
-					BeforeSubMenuOpening.Execute(GetNotifyEventArguments());
-					if(GetSubMenu())
-					{
-						OpenSubMenuInternal();
-					}
-					else if(ownerMenuService)
+					if(!OpenSubMenuInternal() && ownerMenuService)
 					{
 						ownerMenuService->MenuItemExecuted();
 					}
@@ -477,13 +494,11 @@ GuiMenuButton
 
 			void GuiMenuButton::SetSubMenuOpening(bool value)
 			{
-				if(subMenu)
+				if (subMenu && subMenu->GetOpening() != value)
 				{
-					if(value)
+					if (value)
 					{
-						subMenu->SetClientSize(preferredMenuClientSize);
-						IGuiMenuService::Direction direction=GetSubMenuDirection();
-						subMenu->ShowPopup(GetSubMenuHost(), direction==IGuiMenuService::Horizontal);
+						OpenSubMenuInternal();
 					}
 					else
 					{

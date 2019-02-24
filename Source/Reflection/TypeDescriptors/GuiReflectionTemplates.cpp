@@ -35,6 +35,14 @@ Type Declaration (Extra)
 				ENUM_CLASS_ITEM(Descending)
 			END_ENUM_ITEM(ColumnSortingState)
 
+			BEGIN_ENUM_ITEM(TabPageOrder)
+				ENUM_CLASS_ITEM(Unknown)
+				ENUM_CLASS_ITEM(LeftToRight)
+				ENUM_CLASS_ITEM(RightToLeft)
+				ENUM_CLASS_ITEM(TopToBottom)
+				ENUM_CLASS_ITEM(BottomToTop)
+			END_ENUM_ITEM(TabPageOrder)
+
 			BEGIN_ENUM_ITEM(BoolOption)
 				ENUM_CLASS_ITEM(AlwaysTrue)
 				ENUM_CLASS_ITEM(AlwaysFalse)
@@ -46,12 +54,6 @@ Type Declaration (Extra)
 
 				CLASS_MEMBER_METHOD(UnsafeSetText, { L"value" })
 			END_INTERFACE_MEMBER(ITextBoxCommandExecutor)
-
-			BEGIN_INTERFACE_MEMBER_NOPROXY(IComboBoxCommandExecutor)
-				CLASS_MEMBER_BASE(IDescriptable)
-
-				CLASS_MEMBER_METHOD(SelectItem, NO_PARAMETER)
-			END_INTERFACE_MEMBER(IComboBoxCommandExecutor)
 
 			BEGIN_INTERFACE_MEMBER_NOPROXY(IScrollCommandExecutor)
 				CLASS_MEMBER_METHOD(SmallDecrease, NO_PARAMETER)
@@ -65,7 +67,7 @@ Type Declaration (Extra)
 
 			BEGIN_INTERFACE_MEMBER_NOPROXY(ITabCommandExecutor)
 				CLASS_MEMBER_BASE(IDescriptable)
-				CLASS_MEMBER_METHOD(ShowTab, { L"index" })
+				CLASS_MEMBER_METHOD(ShowTab, { L"index" _ L"setFocus" })
 			END_INTERFACE_MEMBER(ITabCommandExecutor)
 
 			BEGIN_INTERFACE_MEMBER_NOPROXY(IDatePickerCommandExecutor)
@@ -208,6 +210,11 @@ Type Declaration (Class)
 				CLASS_MEMBER_BASE(SubColumnVisualizerTemplate)
 				CLASS_MEMBER_CONSTRUCTOR(HyperlinkVisualizerTemplate*(), NO_PARAMETER)
 			END_CLASS_MEMBER(HyperlinkVisualizerTemplate)
+
+			BEGIN_CLASS_MEMBER(FocusRectangleVisualizerTemplate)
+				CLASS_MEMBER_BASE(GuiGridVisualizerTemplate)
+				CLASS_MEMBER_CONSTRUCTOR(FocusRectangleVisualizerTemplate*(), NO_PARAMETER)
+			END_CLASS_MEMBER(FocusRectangleVisualizerTemplate)
 
 			BEGIN_CLASS_MEMBER(CellBorderVisualizerTemplate)
 				CLASS_MEMBER_BASE(GuiGridVisualizerTemplate)

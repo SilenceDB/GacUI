@@ -10,7 +10,6 @@ Interfaces:
 #define VCZH_PRESENTATION_CONTROLS_TEMPLATES_GUIANIMATION
 
 #include "GuiControlShared.h"
-#include "../../../Import/VlppWorkflowLibrary.h"
 
 namespace vl
 {

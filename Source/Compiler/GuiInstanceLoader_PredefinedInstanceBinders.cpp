@@ -46,6 +46,11 @@ GuiResourceInstanceBinder (uri)
 					errors.Add(GuiResourceError({ resolvingResult.resource }, position, L"Precompile: \"" + code + L"\" is not a valid resource uri."));
 					return nullptr;
 				}
+				else if (!precompileContext.resolver->ResolveResource(protocol, path))
+				{
+					errors.Add(GuiResourceError({ resolvingResult.resource }, position, L"Precompile: Resource \"" + code + L"\" does not exist."));
+					return nullptr;
+				}
 				else
 				{
 					return Workflow_GetUriProperty(precompileContext, resolvingResult, loader, prop, propInfo, protocol, path, position, errors);
@@ -58,6 +63,11 @@ GuiResourceInstanceBinder (uri)
 				if (!IsResourceUrl(code, protocol, path))
 				{
 					errors.Add(GuiResourceError({ resolvingResult.resource }, position, L"Precompile: \"" + code + L"\" is not a valid resource uri."));
+					return nullptr;
+				}
+				else if (!precompileContext.resolver->ResolveResource(protocol, path))
+				{
+					errors.Add(GuiResourceError({ resolvingResult.resource }, position, L"Precompile: Resource \"" + code + L"\" does not exist."));
 					return nullptr;
 				}
 				else
@@ -315,18 +325,8 @@ GuiLocalizedStringInstanceBinder (str)
 
 					if (errorCount == errors.Count())
 					{
-						auto stringExpr = MakePtr<WfStringExpression>();
-						stringExpr->value.value = L"";
-						stringExpr->codeRange = expression->codeRange;
-
-						auto recoveryExpr = MakePtr<WfBinaryExpression>();
-						recoveryExpr->op = WfBinaryOperator::FailedThen;
-						recoveryExpr->first = expression;
-						recoveryExpr->second = stringExpr;
-						recoveryExpr->codeRange = expression->codeRange;
-
 						auto bindExpr = MakePtr<WfBindExpression>();
-						bindExpr->expression = recoveryExpr;
+						bindExpr->expression = expression;
 						bindExpr->codeRange = expression->codeRange;
 
 						return Workflow_InstallBindProperty(precompileContext, resolvingResult, variableName, propertyInfo, bindExpr);

@@ -16,7 +16,7 @@ namespace vl
 #define _ ,
 
 #define INTERFACE_IDENTIFIER(INTERFACE)\
-	CLASS_MEMBER_STATIC_EXTERNALMETHOD(GetIdentifier, NO_PARAMETER, WString(*)(), vl::reflection::description::Interface_GetIdentifier<::INTERFACE>)
+	CLASS_MEMBER_STATIC_EXTERNALMETHOD(GetIdentifier, NO_PARAMETER, WString(*)(), vl::presentation::controls::QueryServiceHelper<::INTERFACE>::GetIdentifier)
 
 /***********************************************************************
 Type Declaration (Extra)
@@ -163,12 +163,22 @@ Type Declaration (Extra)
 			BEGIN_INTERFACE_MEMBER_NOPROXY(IGuiAltActionHost)
 				INTERFACE_IDENTIFIER(vl::presentation::compositions::IGuiAltActionHost)
 
+				CLASS_MEMBER_PROPERTY_READONLY_FAST(AltComposition)
 				CLASS_MEMBER_PROPERTY_READONLY_FAST(PreviousAltHost)
 
 				CLASS_MEMBER_METHOD(OnActivatedAltHost, { L"previousHost" })
 				CLASS_MEMBER_METHOD(OnDeactivatedAltHost, NO_PARAMETER)
 				CLASS_MEMBER_EXTERNALMETHOD(CollectAltActions, {L"actions"}, void(IGuiAltActionHost::*)(List<IGuiAltAction*>&), vl::reflection::description::IGuiAltActionHost_CollectAltActions)
 			END_INTERFACE_MEMBER(IGuiAltActionHost)
+
+			BEGIN_INTERFACE_MEMBER_NOPROXY(IGuiTabAction)
+				INTERFACE_IDENTIFIER(vl::presentation::compositions::IGuiTabAction)
+
+				CLASS_MEMBER_PROPERTY_READONLY_FAST(AcceptTabInput)
+				CLASS_MEMBER_PROPERTY_READONLY_FAST(TabPriority)
+				CLASS_MEMBER_METHOD(IsTabEnabled, NO_PARAMETER)
+				CLASS_MEMBER_METHOD(IsTabAvailable, NO_PARAMETER)
+			END_INTERFACE_MEMBER(IGuiTabAction)
 
 /***********************************************************************
 Type Declaration (Class)

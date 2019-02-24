@@ -24,7 +24,7 @@ GalleryItemArranger
 					}
 				}
 
-				void GalleryItemArranger::PlaceItem(bool forMoving, vint index, ItemStyleRecord style, Rect viewBounds, Rect& bounds, Margin& alignmentToParent)
+				void GalleryItemArranger::PlaceItem(bool forMoving, bool newCreatedStyle, vint index, ItemStyleRecord style, Rect viewBounds, Rect& bounds, Margin& alignmentToParent)
 				{
 					alignmentToParent = Margin(-1, 0, -1, 0);
 					bounds = Rect(Point((index - firstIndex) * itemWidth, 0), Size(itemWidth, 0));
@@ -117,24 +117,31 @@ GalleryItemArranger
 					else return itemIndex;
 				}
 
-				bool GalleryItemArranger::EnsureItemVisible(vint itemIndex)
+				GuiListControl::EnsureItemVisibleResult GalleryItemArranger::EnsureItemVisible(vint itemIndex)
 				{
-					if (callback && 0 <= itemIndex && itemIndex < itemProvider->Count())
+					if (callback)
 					{
-						vint groupCount = viewBounds.Width() / itemWidth;
-						if (itemIndex < firstIndex)
+						if (0 <= itemIndex && itemIndex < itemProvider->Count())
 						{
-							firstIndex = itemIndex;
-							callback->OnTotalSizeChanged();
+							vint groupCount = viewBounds.Width() / itemWidth;
+							if (itemIndex < firstIndex)
+							{
+								firstIndex = itemIndex;
+								callback->OnTotalSizeChanged();
+							}
+							else if (itemIndex >= firstIndex + groupCount)
+							{
+								firstIndex = itemIndex - groupCount + 1;
+								callback->OnTotalSizeChanged();
+							}
+							return GuiListControl::EnsureItemVisibleResult::NotMoved;
 						}
-						else if (itemIndex >= firstIndex + groupCount)
+						else
 						{
-							firstIndex = itemIndex - groupCount + 1;
-							callback->OnTotalSizeChanged();
+							return GuiListControl::EnsureItemVisibleResult::ItemNotExists;
 						}
-						return true;
 					}
-					return false;
+					return GuiListControl::EnsureItemVisibleResult::NotMoved;
 				}
 
 				Size GalleryItemArranger::GetAdoptedSize(Size expectedSize)

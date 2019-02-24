@@ -9,12 +9,18 @@ Interfaces:
 #ifndef VCZH_PRESENTATION_CONTROLS_GUIWINDOWCONTROLS
 #define VCZH_PRESENTATION_CONTROLS_GUIWINDOWCONTROLS
 
-#include "GuiLabelControls.h"
+#include "GuiBasicControls.h"
 
 namespace vl
 {
 	namespace presentation
 	{
+		namespace compositions
+		{
+			class IGuiShortcutKeyManager;
+			class GuiGraphicsTimerManager;
+		}
+
 		namespace controls
 		{
 
@@ -34,13 +40,16 @@ Control Host
 				virtual void									OnNativeWindowChanged();
 				virtual void									OnVisualStatusChanged();
 			protected:
-				static const vint								TooltipDelayOpenTime=500;
-				static const vint								TooltipDelayCloseTime=500;
-				static const vint								TooltipDelayLifeTime=5000;
+				static const vint								TooltipDelayOpenTime = 500;
+				static const vint								TooltipDelayCloseTime = 500;
+				static const vint								TooltipDelayLifeTime = 5000;
 
 				Ptr<INativeDelay>								tooltipOpenDelay;
 				Ptr<INativeDelay>								tooltipCloseDelay;
 				Point											tooltipLocation;
+
+				bool											calledDestroyed = false;
+				bool											deleteWhenDestroyed = false;
 
 				controls::GuiControlHost*						GetControlHostForInstance()override;
 				GuiControl*										GetTooltipOwner(Point location);
@@ -83,6 +92,9 @@ Control Host
 				/// <summary>Window destroying event.</summary>
 				compositions::GuiNotifyEvent					WindowDestroying;
 
+				/// <summary>Delete this control host after processing all events.</summary>
+				void											DeleteAfterProcessingAllEvents();
+
 				/// <summary>Get the internal <see cref="compositions::GuiGraphicsHost"/> object to host the window content.</summary>
 				/// <returns>The internal <see cref="compositions::GuiGraphicsHost"/> object to host the window content.</returns>
 				compositions::GuiGraphicsHost*					GetGraphicsHost();
@@ -106,7 +118,7 @@ Control Host
 				void											SetEnabled(bool value)override;
 				/// <summary>Test is the window focused.</summary>
 				/// <returns>Returns true if the window is focused.</returns>
-				bool											GetFocused();
+				bool											GetFocused()override;
 				/// <summary>Focus the window.</summary>
 				void											SetFocused();
 				/// <summary>Test is the window activated.</summary>
@@ -153,12 +165,17 @@ Control Host
 				/// <summary>Set the client size of the window.</summary>
 				/// <param name="value">The client size of the window.</param>
 				void											SetClientSize(Size value);
-				/// <summary>Get the bounds of the window in screen space.</summary>
-				/// <returns>The bounds of the window.</returns>
-				Rect											GetBounds();
-				/// <summary>Set the bounds of the window in screen space.</summary>
-				/// <param name="value">The bounds of the window.</param>
-				void											SetBounds(Rect value);
+				/// <summary>Get the location of the window in screen space.</summary>
+				/// <returns>The location of the window.</returns>
+				NativePoint										GetLocation();
+				/// <summary>Set the location of the window in screen space.</summary>
+				/// <param name="value">The location of the window.</param>
+				void											SetLocation(NativePoint value);
+				/// <summary>Set the location in screen space and the client size of the window.</summary>
+				/// <param name="location">The location of the window.</param>
+				/// <param name="size">The client size of the window.</param>
+				void											SetBounds(NativePoint location, Size size);
+
 				GuiControlHost*									GetRelatedControlHost()override;
 				const WString&									GetText()override;
 				void											SetText(const WString& value)override;
@@ -206,30 +223,30 @@ Window
 			/// <summary>
 			/// Represents a normal window.
 			/// </summary>
-			class GuiWindow : public GuiControlHost, protected compositions::IGuiAltActionHost, public AggregatableDescription<GuiWindow>
+			class GuiWindow : public GuiControlHost, protected compositions::GuiAltActionHostBase, public AggregatableDescription<GuiWindow>
 			{
 				GUI_SPECIFY_CONTROL_TEMPLATE_TYPE(WindowTemplate, GuiControlHost)
 				friend class GuiApplication;
 			protected:
-				compositions::IGuiAltActionHost*		previousAltHost;
+				compositions::IGuiAltActionHost*		previousAltHost = nullptr;
 				bool									hasMaximizedBox = true;
 				bool									hasMinimizedBox = true;
 				bool									hasBorder = true;
 				bool									hasSizeBox = true;
 				bool									isIconVisible = true;
 				bool									hasTitleBar = true;
+				Ptr<GuiImageData>						icon;
 				
+				void									UpdateCustomFramePadding(INativeWindow* window, templates::GuiWindowTemplate* ct);
 				void									SyncNativeWindowProperties();
 				void									Moved()override;
+				void									DpiChanged()override;
 				void									OnNativeWindowChanged()override;
 				void									OnVisualStatusChanged()override;
 				virtual void							MouseClickedOnOtherWindow(GuiWindow* window);
-
-				compositions::GuiGraphicsComposition*	GetAltComposition()override;
-				compositions::IGuiAltActionHost*		GetPreviousAltHost()override;
-				void									OnActivatedAltHost(IGuiAltActionHost* previousHost)override;
-				void									OnDeactivatedAltHost()override;
-				void									CollectAltActions(collections::Group<WString, IGuiAltAction*>& actions)override;
+				
+				void									OnWindowActivated(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments);
+				void									OnWindowDeactivated(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments);
 			public:
 				/// <summary>Create a control with a specified default theme.</summary>
 				/// <param name="themeName">The theme name for retriving a default control template.</param>
@@ -298,6 +315,16 @@ Window
 				/// <param name="visible">True to make the icon visible.</param>
 				void									SetIconVisible(bool visible);
 				/// <summary>
+				/// Get the icon which replaces the default one.
+				/// </summary>
+				/// <returns>Returns the icon that replaces the default one.</returns>
+				Ptr<GuiImageData>						GetIcon();
+				/// <summary>
+				/// Set the icon that replaces the default one.
+				/// </summary>
+				/// <param name="value">The icon that replaces the default one.</param>
+				void									SetIcon(Ptr<GuiImageData> value);
+				/// <summary>
 				/// Test is the title bar visible.
 				/// </summary>
 				/// <returns>Returns true if the title bar is visible.</returns>
@@ -335,7 +362,7 @@ Window
 			protected:
 				union PopupInfo
 				{
-					struct _s1 { Point location; INativeScreen* screen; };
+					struct _s1 { NativePoint location; INativeScreen* screen; };
 					struct _s2 { GuiControl* control; INativeWindow* controlWindow; Rect bounds; bool preferredTopBottomSide; };
 					struct _s3 { GuiControl* control; INativeWindow* controlWindow; Point location; };
 					struct _s4 { GuiControl* control; INativeWindow* controlWindow; bool preferredTopBottomSide; };
@@ -355,13 +382,14 @@ Window
 				void									MouseClickedOnOtherWindow(GuiWindow* window)override;
 				void									PopupOpened(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments);
 				void									PopupClosed(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments);
+				void									OnKeyDown(compositions::GuiGraphicsComposition* sender, compositions::GuiKeyEventArgs& arguments);
 
-				static bool								IsClippedByScreen(Size size, Point location, INativeScreen* screen);
-				static Point							CalculatePopupPosition(Size size, Point location, INativeScreen* screen);
-				static Point							CalculatePopupPosition(Size size, GuiControl* control, INativeWindow* controlWindow, Rect bounds, bool preferredTopBottomSide);
-				static Point							CalculatePopupPosition(Size size, GuiControl* control, INativeWindow* controlWindow, Point location);
-				static Point							CalculatePopupPosition(Size size, GuiControl* control, INativeWindow* controlWindow, bool preferredTopBottomSide);
-				static Point							CalculatePopupPosition(Size size, vint popupType, const PopupInfo& popupInfo);
+				static bool								IsClippedByScreen(NativeSize size, NativePoint location, INativeScreen* screen);
+				static NativePoint						CalculatePopupPosition(NativeSize windowSize, NativePoint location, INativeScreen* screen);
+				static NativePoint						CalculatePopupPosition(NativeSize windowSize, GuiControl* control, INativeWindow* controlWindow, Rect bounds, bool preferredTopBottomSide);
+				static NativePoint						CalculatePopupPosition(NativeSize windowSize, GuiControl* control, INativeWindow* controlWindow, Point location);
+				static NativePoint						CalculatePopupPosition(NativeSize windowSize, GuiControl* control, INativeWindow* controlWindow, bool preferredTopBottomSide);
+				static NativePoint						CalculatePopupPosition(NativeSize windowSize, vint popupType, const PopupInfo& popupInfo);
 
 				void									ShowPopupInternal();
 			public:
@@ -377,7 +405,7 @@ Window
 				/// <summary>Show the popup window with the left-top position set to a specified value. The position of the popup window will be adjusted to make it totally inside the screen if possible.</summary>
 				/// <param name="location">The specified left-top position.</param>
 				/// <param name="screen">The expected screen. If you don't want to specify any screen, don't set this parameter.</param>
-				void									ShowPopup(Point location, INativeScreen* screen = 0);
+				void									ShowPopup(NativePoint location, INativeScreen* screen = 0);
 				/// <summary>Show the popup window with the bounds set to a specified control-relative value. The position of the popup window will be adjusted to make it totally inside the screen if possible.</summary>
 				/// <param name="control">The control that owns this popup temporary. And the location is relative to this control.</param>
 				/// <param name="bounds">The specified bounds.</param>

@@ -1,7 +1,10 @@
 #include "GuiGraphicsWindowsDirect2D.h"
 #include "GuiGraphicsRenderersWindowsDirect2D.h"
 #include "GuiGraphicsLayoutProviderWindowsDirect2D.h"
+#include "..\..\NativeWindow\Windows\ServicesImpl\WindowsImageService.h"
+#include "..\..\GraphicsElement\GuiGraphicsDocumentElement.h"
 #include "..\..\Controls\GuiApplication.h"
+#include "..\..\NativeWindow\Windows\GDI\WinGDI.h"
 #include <math.h>
 
 namespace vl
@@ -24,6 +27,7 @@ GuiDirect2DElement
 		{
 			using namespace elements;
 			using namespace collections;
+			using namespace windows;
 
 			D2D1::ColorF GetD2DColor(Color color)
 			{
@@ -212,13 +216,15 @@ CachedResourceAllocator
 					ComPtr<IDWriteTextFormat>		font;
 					vint								size;
 
-					Size MeasureInternal(wchar_t character, IGuiGraphicsRenderTarget* renderTarget)
+					Size MeasureInternal(text::UnicodeCodePoint codePoint, IGuiGraphicsRenderTarget* renderTarget)
 					{
 						Size charSize(0, 0);
 						IDWriteTextLayout* textLayout = 0;
+
+						UINT32 count = text::UTF16SPFirst(codePoint.characters[0]) && text::UTF16SPSecond(codePoint.characters[1]) ? 2 : 1;
 						HRESULT hr = GetWindowsDirect2DObjectProvider()->GetDirectWriteFactory()->CreateTextLayout(
-							&character,
-							1,
+							codePoint.characters,
+							count,
 							font.Obj(),
 							0,
 							0,
@@ -235,14 +241,14 @@ CachedResourceAllocator
 						return charSize;
 					}
 
-					vint MeasureWidthInternal(wchar_t character, IGuiGraphicsRenderTarget* renderTarget)
+					vint MeasureWidthInternal(text::UnicodeCodePoint codePoint, IGuiGraphicsRenderTarget* renderTarget)
 					{
-						return MeasureInternal(character, renderTarget).x;
+						return MeasureInternal(codePoint, renderTarget).x;
 					}
 
 					vint GetRowHeightInternal(IGuiGraphicsRenderTarget* renderTarget)
 					{
-						return MeasureInternal(L' ', renderTarget).y;
+						return MeasureInternal({ L' ' }, renderTarget).y;
 					}
 				public:
 					Direct2DCharMeasurer(ComPtr<IDWriteTextFormat> _font, vint _size)
@@ -360,6 +366,7 @@ WindowsDirect2DRenderTarget
 			protected:
 				INativeWindow*					window;
 				ID2D1RenderTarget*				d2dRenderTarget = nullptr;
+				ID2D1DeviceContext*				d2dDeviceContext = nullptr;
 				List<Rect>						clippers;
 				vint							clipperCoverWholeTargetCounter = 0;
 
@@ -367,6 +374,7 @@ WindowsDirect2DRenderTarget
 				CachedLinearBrushAllocator		linearBrushes;
 				CachedRadialBrushAllocator		radialBrushes;
 				ImageCacheList					imageCaches;
+				ComPtr<ID2D1Effect>				focusRectangleEffect;
 
 				ComPtr<IDWriteRenderingParams>	noAntialiasParams;
 				ComPtr<IDWriteRenderingParams>	horizontalAntialiasParams;
@@ -540,19 +548,64 @@ WindowsDirect2DRenderTarget
 
 				Rect GetClipper()override
 				{
-					if(clippers.Count()==0)
+					if (clippers.Count() == 0)
 					{
-						return Rect(Point(0, 0), window->GetClientSize());
+						return Rect(Point(0, 0), window->Convert(window->GetClientSize()));
 					}
 					else
 					{
-						return clippers[clippers.Count()-1];
+						return clippers[clippers.Count() - 1];
 					}
 				}
 
 				bool IsClipperCoverWholeTarget()override
 				{
 					return clipperCoverWholeTargetCounter>0;
+				}
+
+				ID2D1Effect* GetFocusRectangleEffect()override
+				{
+					if (!focusRectangleEffect)
+					{
+						ID2D1RenderTarget* d2dRenderTarget = GetWindowsDirect2DObjectProvider()->GetNativeWindowDirect2DRenderTarget(window);
+						ID2D1DeviceContext* d2dDeviceContext = nullptr;
+						HRESULT hr = d2dRenderTarget->QueryInterface(&d2dDeviceContext);
+						if (d2dDeviceContext)
+						{
+							if (auto wicFactory = GetWICImagingFactory())
+							{
+								// this is the content of EffectBuffer.png in the same folder where this cpp file is in
+								static const char EffectBuffer[] =
+									"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A\x00\x00\x00\x0D\x49\x48\x44\x52\x00\x00\x00\x08\x00\x00\x00\x08\x08\x06\x00\x00"
+									"\x00\xC4\x0F\xBE\x8B\x00\x00\x00\x01\x73\x52\x47\x42\x00\xAE\xCE\x1C\xE9\x00\x00\x00\x04\x67\x41\x4D\x41\x00\x00"
+									"\xB1\x8F\x0B\xFC\x61\x05\x00\x00\x00\x09\x70\x48\x59\x73\x00\x00\x0E\xC3\x00\x00\x0E\xC3\x01\xC7\x6F\xA8\x64\x00"
+									"\x00\x00\x2F\x49\x44\x41\x54\x28\x53\x75\xC8\xB1\x0D\x00\x30\x0C\x02\x41\xEF\xBF\x34\xB1\x68\xA2\x47\xF8\x9B\x13"
+									"\x8C\xB6\xD9\x2E\x5D\x9E\x10\xA3\xE8\xF2\x84\x18\x45\x97\x27\xC4\x28\xBA\x3C\xBF\xD2\x03\xC2\xD7\x7F\x81\x23\x94"
+									"\x3E\x1F\x00\x00\x00\x00\x49\x45\x4E\x44\xAE\x42\x60\x82";
+								auto effectImage = GetCurrentController()->ImageService()->CreateImageFromMemory((void*)EffectBuffer, (vint)(sizeof(EffectBuffer) - 1));
+								IWICBitmap* wicEffectBitmap = effectImage ? GetWICBitmap(effectImage->GetFrame(0)) : nullptr;
+								if (wicEffectBitmap)
+								{
+									ID2D1Bitmap* d2dEffectBitmap = nullptr;
+									hr = d2dRenderTarget->CreateBitmapFromWicBitmap(wicEffectBitmap, &d2dEffectBitmap);
+									if (d2dEffectBitmap)
+									{
+										ID2D1Effect* d2dEffect = nullptr;
+										hr = d2dDeviceContext->CreateEffect(CLSID_D2D1Tile, &d2dEffect);
+										if (d2dEffect)
+										{
+											d2dEffect->SetInput(0, d2dEffectBitmap);
+											d2dEffect->SetValue(D2D1_TILE_PROP_RECT, D2D1::RectF(0, 0, 2, 2));
+											focusRectangleEffect = d2dEffect;
+										}
+										d2dEffectBitmap->Release();
+									}
+								}
+							}
+							d2dDeviceContext->Release();
+						}
+					}
+					return focusRectangleEffect.Obj();
 				}
 
 				ID2D1SolidColorBrush* CreateDirect2DBrush(Color color)override
@@ -709,6 +762,7 @@ void RendererMainDirect2D()
 	elements_windows_d2d::SetWindowsDirect2DResourceManager(&resourceManager);
 	GetCurrentController()->CallbackService()->InstallListener(&resourceManager);
 
+	elements_windows_d2d::GuiFocusRectangleElementRenderer::Register();
 	elements_windows_d2d::GuiSolidBorderElementRenderer::Register();
 	elements_windows_d2d::Gui3DBorderElementRenderer::Register();
 	elements_windows_d2d::Gui3DSplitterElementRenderer::Register();

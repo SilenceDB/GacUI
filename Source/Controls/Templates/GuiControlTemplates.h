@@ -10,6 +10,7 @@ Interfaces:
 #define VCZH_PRESENTATION_CONTROLS_TEMPLATES_GUICONTROLTEMPLATES
 
 #include "GuiControlShared.h"
+#include "../../GraphicsElement/GuiGraphicsTextElement.h"
 
 namespace vl
 {
@@ -172,10 +173,11 @@ Control Template
 				AlwaysFalse,
 				Customizable,
 			};
-				
+
 #define GuiControlTemplate_PROPERTIES(F)\
 				F(GuiControlTemplate, compositions::GuiGraphicsComposition*, ContainerComposition, this)\
 				F(GuiControlTemplate, compositions::GuiGraphicsComposition*, FocusableComposition, nullptr)\
+				F(GuiControlTemplate, bool, Focused, false)\
 
 #define GuiLabelTemplate_PROPERTIES(F)\
 				F(GuiLabelTemplate, Color, DefaultTextColor, {})\
@@ -202,11 +204,13 @@ Control Template
 				F(GuiWindowTemplate, bool, SizeBox, true)\
 				F(GuiWindowTemplate, bool, IconVisible, true)\
 				F(GuiWindowTemplate, bool, TitleBar, true)\
-				F(GuiWindowTemplate, bool, CustomizedBorder, false)\
 				F(GuiWindowTemplate, bool, Maximized, false)\
+				F(GuiWindowTemplate, bool, Activated, false)\
 				F(GuiWindowTemplate, TemplateProperty<GuiWindowTemplate>, TooltipTemplate, {})\
 				F(GuiWindowTemplate, TemplateProperty<GuiLabelTemplate>, ShortcutKeyTemplate, {})\
 				F(GuiWindowTemplate, bool, CustomFrameEnabled, true)\
+				F(GuiWindowTemplate, Margin, CustomFramePadding, {})\
+				F(GuiWindowTemplate, Ptr<GuiImageData>, Icon, {})\
 
 #define GuiMenuTemplate_PROPERTIES(F)
 
@@ -229,7 +233,6 @@ Control Template
 				F(GuiListViewColumnHeaderTemplate, controls::ColumnSortingState, SortingState, controls::ColumnSortingState::NotSorted)\
 
 #define GuiComboBoxTemplate_PROPERTIES(F)\
-				F(GuiComboBoxTemplate, controls::IComboBoxCommandExecutor*, Commands, nullptr)\
 				F(GuiComboBoxTemplate, bool, TextVisible, true)\
 
 #define GuiScrollTemplate_PROPERTIES(F)\
@@ -273,6 +276,7 @@ Control Template
 				F(GuiTabTemplate, controls::ITabCommandExecutor*, Commands, nullptr)\
 				F(GuiTabTemplate, Ptr<reflection::description::IValueObservableList>, TabPages, {})\
 				F(GuiTabTemplate, controls::GuiTabPage*, SelectedTabPage, nullptr)\
+				F(GuiTabTemplate, controls::TabPageOrder, TabOrder, controls::TabPageOrder::Unknown)\
 
 #define GuiDatePickerTemplate_PROPERTIES(F)\
 				F(GuiDatePickerTemplate, controls::IDatePickerCommandExecutor*, Commands, nullptr)\

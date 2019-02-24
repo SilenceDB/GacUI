@@ -1,5 +1,9 @@
 #include "GuiRibbonControls.h"
 #include "../Templates/GuiThemeStyleFactory.h"
+#include "../../GraphicsComposition/GuiGraphicsStackComposition.h"
+#include "../../GraphicsComposition/GuiGraphicsTableComposition.h"
+#include "../../GraphicsComposition/GuiGraphicsResponsiveComposition.h"
+#include "../../GraphicsComposition/GuiGraphicsSharedSizeComposition.h"
 
 namespace vl
 {
@@ -564,6 +568,7 @@ GuiRibbonButtons
 					case ThemeName::RibbonIconLabel:
 						type = 3;
 						break;
+					default:;
 					}
 
 					if (type != -1)

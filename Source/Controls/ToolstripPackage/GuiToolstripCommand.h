@@ -15,6 +15,11 @@ namespace vl
 {
 	namespace presentation
 	{
+		namespace compositions
+		{
+			class IGuiShortcutKeyItem;
+		}
+
 		namespace controls
 		{
 			/// <summary>A command for toolstrip controls.</summary>
@@ -28,7 +33,7 @@ namespace vl
 					bool									ctrl;
 					bool									shift;
 					bool									alt;
-					vint									key;
+					VKEY									key;
 				};
 			protected:
 				Ptr<GuiImageData>							image;

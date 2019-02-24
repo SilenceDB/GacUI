@@ -1,5 +1,6 @@
 #include "GuiGraphicsCompositionBase.h"
 #include "../Controls/GuiWindowControls.h"
+#include "../GraphicsHost/GuiGraphicsHost.h"
 
 namespace vl
 {
@@ -716,8 +717,15 @@ Helper Functions
 
 			void SafeDeleteControl(controls::GuiControl* value)
 			{
-				NotifyFinalizeInstance(value);
-				SafeDeleteControlInternal(value);
+				if (auto controlHost = dynamic_cast<controls::GuiControlHost*>(value))
+				{
+					controlHost->DeleteAfterProcessingAllEvents();
+				}
+				else
+				{
+					NotifyFinalizeInstance(value);
+					SafeDeleteControlInternal(value);
+				}
 			}
 
 			void SafeDeleteComposition(GuiGraphicsComposition* value)

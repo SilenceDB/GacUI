@@ -98,38 +98,33 @@ namespace vl
 			}
 		};
 
-		Ptr<GuiInstanceCompiledWorkflow> Workflow_GetModule(GuiResourcePrecompileContext& context, const WString& path)
+		Ptr<GuiInstanceCompiledWorkflow> Workflow_GetModule(GuiResourcePrecompileContext& context, const WString& path, Nullable<GuiInstanceCompiledWorkflow::AssemblyType> assemblyType)
 		{
-			return context.targetFolder->GetValueByPath(path).Cast<GuiInstanceCompiledWorkflow>();
+			auto compiled = context.targetFolder->GetValueByPath(path).Cast<GuiInstanceCompiledWorkflow>();
+			if (assemblyType && !compiled)
+			{
+				compiled = new GuiInstanceCompiledWorkflow;
+				compiled->type = assemblyType.Value();
+				context.targetFolder->CreateValueByPath(path, L"Workflow", compiled);
+			}
+			return compiled;
 		}
 
 		void Workflow_AddModule(GuiResourcePrecompileContext& context, const WString& path, Ptr<WfModule> module, GuiInstanceCompiledWorkflow::AssemblyType assemblyType, GuiResourceTextPos tagPosition)
 		{
-			auto compiled = Workflow_GetModule(context, path);
-			if (!compiled)
-			{
-				compiled = new GuiInstanceCompiledWorkflow;
-				compiled->type = assemblyType;
-				context.targetFolder->CreateValueByPath(path, L"Workflow", compiled);
-			}
-			else
-			{
-				CHECK_ERROR(compiled->type == assemblyType, L"Workflow_AddModule(GuiResourcePrecompiledContext&, const WString&, GuiInstanceCompiledWorkflow::AssemblyType)#Unexpected assembly type.");
-			}
+			auto compiled = Workflow_GetModule(context, path, assemblyType);
+			CHECK_ERROR(compiled->type == assemblyType, L"Workflow_AddModule(GuiResourcePrecompiledContext&, const WString&, GuiInstanceCompiledWorkflow::AssemblyType)#Unexpected assembly type.");
 
-			if (compiled)
-			{
-				GuiInstanceCompiledWorkflow::ModuleRecord record;
-				record.module = module;
-				record.position = tagPosition;
-				record.shared = assemblyType == GuiInstanceCompiledWorkflow::Shared;
-				compiled->modules.Add(record);
-			}
+			GuiInstanceCompiledWorkflow::ModuleRecord record;
+			record.module = module;
+			record.position = tagPosition;
+			record.shared = assemblyType == GuiInstanceCompiledWorkflow::Shared;
+			compiled->modules.Add(record);
 		}
 
 		void Workflow_GenerateAssembly(GuiResourcePrecompileContext& context, const WString& path, GuiResourceError::List& errors, bool keepMetadata, IWfCompilerCallback* compilerCallback)
 		{
-			auto compiled = Workflow_GetModule(context, path);
+			auto compiled = Workflow_GetModule(context, path, {});
 			if (!compiled)
 			{
 				return;
@@ -170,14 +165,18 @@ namespace vl
 				if (manager->errors.Count() == 0)
 				{
 					compiled->assembly = GenerateAssembly(manager, compilerCallback);
-					compiled->Initialize(true);
+					WfAssemblyLoadErrors loadErrors;
+					if (!compiled->Initialize(true, loadErrors))
+					{
+						manager->errors.Add(new ParsingError(L"Internal error happened during loading an assembly that just passed type verification."));
+					}
 				}
 				else
 				{
-					WorkflowVirtualScriptPositionVisitor visitor(context);
 					for (vint i = 0; i < compiled->modules.Count(); i++)
 					{
 						auto module = compiled->modules[i];
+						WorkflowVirtualScriptPositionVisitor visitor(context);
 						visitor.VisitField(module.module.Obj());
 						Workflow_RecordScriptPosition(context, module.position, module.module);
 					}
@@ -286,7 +285,7 @@ Shared Script Type Resolver (Script)
 				{
 				case Workflow_Compile:
 					Workflow_GenerateAssembly(context, Path_Shared, errors, false, context.compilerCallback);
-					if (auto compiled = Workflow_GetModule(context, Path_Shared))
+					if (auto compiled = Workflow_GetModule(context, Path_Shared, {}))
 					{
 						for (vint i = 0; i < compiled->modules.Count(); i++)
 						{
@@ -390,8 +389,8 @@ Instance Type Resolver (Instance)
 				}
 			}
 
-#define ENSURE_ASSEMBLY_EXISTS(PATH)\
-			if (auto compiled = Workflow_GetModule(context, PATH))\
+#define ENSURE_ASSEMBLY_EXISTS(PATH, ASSEMBLY_TYPE)\
+			if (auto compiled = Workflow_GetModule(context, PATH, GuiInstanceCompiledWorkflow::ASSEMBLY_TYPE))\
 			{\
 				if (!compiled->assembly)\
 				{\
@@ -404,13 +403,13 @@ Instance Type Resolver (Instance)
 			}\
 
 #define UNLOAD_ASSEMBLY(PATH)\
-			if (auto compiled = Workflow_GetModule(context, PATH))\
+			if (auto compiled = Workflow_GetModule(context, PATH, {}))\
 			{\
 				compiled->context = nullptr;\
 			}\
 
 #define DELETE_ASSEMBLY(PATH)\
-			if (auto compiled = Workflow_GetModule(context, PATH))\
+			if (auto compiled = Workflow_GetModule(context, PATH, {}))\
 			{\
 				compiled->context = nullptr;\
 				compiled->assembly = nullptr;\
@@ -440,7 +439,7 @@ Instance Type Resolver (Instance)
 					}
 					break;
 				case Instance_CollectEventHandlers:
-					ENSURE_ASSEMBLY_EXISTS(Path_TemporaryClass)
+					ENSURE_ASSEMBLY_EXISTS(Path_TemporaryClass, TemporaryClass)
 				case Instance_CollectInstanceTypes:
 					{
 						if (auto obj = resource->GetContent().Cast<GuiInstanceContext>())
@@ -466,31 +465,6 @@ Instance Type Resolver (Instance)
 								}
 							}
 
-							FOREACH(Ptr<GuiInstanceLocalized>, localized, obj->localizeds)
-							{
-								WString protocol, path;
-								if (IsResourceUrl(localized->uri.ToString(), protocol, path))
-								{
-									if (auto ls = context.resolver->ResolveResource(protocol, path).Cast<GuiInstanceLocalizedStrings>())
-									{
-										localized->className = ls->className;
-										localized->interfaceName = ls->GetInterfaceTypeName(true);
-									}
-									else
-									{
-										errors.Add(GuiResourceError({ resource }, localized->tagPosition,
-											L"Failed to find the localized string referred in attribute \"Uri\": \"" + localized->uri.ToString() + L"\".")
-										);
-									}
-								}
-								else
-								{
-									errors.Add(GuiResourceError({ resource }, localized->tagPosition,
-										L"Invalid path in attribute \"Uri\": \"" + localized->uri.ToString() + L"\".")
-									);
-								}
-							}
-
 							obj->ApplyStyles(resource, context.resolver, errors);
 
 							types::ResolvingResult resolvingResult;
@@ -505,7 +479,7 @@ Instance Type Resolver (Instance)
 					break;
 				case Instance_GenerateInstanceClass:
 					{
-						ENSURE_ASSEMBLY_EXISTS(Path_TemporaryClass)
+						ENSURE_ASSEMBLY_EXISTS(Path_TemporaryClass, TemporaryClass)
 						if (auto obj = resource->GetContent().Cast<GuiInstanceContext>())
 						{
 							vint previousErrorCount = errors.Count();
@@ -535,26 +509,30 @@ Instance Type Resolver (Instance)
 			void PerPassPrecompile(GuiResourcePrecompileContext& context, GuiResourceError::List& errors)override
 			{
 				WString path;
+				GuiInstanceCompiledWorkflow::AssemblyType assemblyType;
 				switch (context.passIndex)
 				{
 				case Instance_CompileInstanceTypes:
 					DELETE_ASSEMBLY(Path_Shared)
 					path = Path_TemporaryClass;
+					assemblyType = GuiInstanceCompiledWorkflow::TemporaryClass;
 					break;
 				case Instance_CompileEventHandlers:
 					DELETE_ASSEMBLY(Path_TemporaryClass)
 					path = Path_TemporaryClass;
+					assemblyType = GuiInstanceCompiledWorkflow::TemporaryClass;
 					break;
 				case Instance_CompileInstanceClass:
 					UNLOAD_ASSEMBLY(Path_TemporaryClass)
 					path = Path_InstanceClass;
+					assemblyType = GuiInstanceCompiledWorkflow::InstanceClass;
 					break;
 				default:
 					return;
 				}
 
-				auto sharedCompiled = Workflow_GetModule(context, Path_Shared);
-				auto compiled = Workflow_GetModule(context, path);
+				auto sharedCompiled = Workflow_GetModule(context, Path_Shared, {});
+				auto compiled = Workflow_GetModule(context, path, assemblyType);
 				if (sharedCompiled && compiled)
 				{
 					CopyFrom(

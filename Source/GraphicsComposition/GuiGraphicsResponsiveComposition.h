@@ -6,10 +6,10 @@ GacUI::Composition System
 Interfaces:
 ***********************************************************************/
 
-#ifndef VCZH_PRESENTATION_ELEMENTS_GUIGRAPHICSRESPONSIVECOMPOSITION
-#define VCZH_PRESENTATION_ELEMENTS_GUIGRAPHICSRESPONSIVECOMPOSITION
+#ifndef VCZH_PRESENTATION_COMPOSITION_GUIGRAPHICSRESPONSIVECOMPOSITION
+#define VCZH_PRESENTATION_COMPOSITION_GUIGRAPHICSRESPONSIVECOMPOSITION
 
-#include "GuiGraphicsBasicComposition.h"
+#include "IncludeForward.h"
 
 namespace vl
 {
@@ -74,9 +74,6 @@ GuiResponsiveCompositionBase
 /***********************************************************************
 GuiResponsiveViewComposition
 ***********************************************************************/
-
-			class GuiResponsiveViewComposition;
-			class GuiResponsiveSharedComposition;
 
 			class GuiResponsiveSharedCollection : public collections::ObservableListBase<controls::GuiControl*>
 			{

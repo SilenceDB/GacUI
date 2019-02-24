@@ -6,10 +6,10 @@ GacUI::Composition System
 Interfaces:
 ***********************************************************************/
 
-#ifndef VCZH_PRESENTATION_ELEMENTS_GUIGRAPHICSTABLECOMPOSITION
-#define VCZH_PRESENTATION_ELEMENTS_GUIGRAPHICSTABLECOMPOSITION
+#ifndef VCZH_PRESENTATION_COMPOSITION_GUIGRAPHICSTABLECOMPOSITION
+#define VCZH_PRESENTATION_COMPOSITION_GUIGRAPHICSTABLECOMPOSITION
 
-#include "GuiGraphicsBasicComposition.h"
+#include "IncludeForward.h"
 
 namespace vl
 {
@@ -21,12 +21,6 @@ namespace vl
 /***********************************************************************
 Table Compositions
 ***********************************************************************/
-
-			class GuiTableComposition;
-			class GuiCellComposition;
-			class GuiTableSplitterCompositionBase;
-			class GuiRowSplitterComposition;
-			class GuiColumnSplitterComposition;
 
 			/// <summary>
 			/// Represnets a sizing configuration for a row or a column.

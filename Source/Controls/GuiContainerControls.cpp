@@ -87,6 +87,28 @@ GuiTabPageList
 			}
 
 /***********************************************************************
+GuiTab::CommandExecutor
+***********************************************************************/
+
+			GuiTab::CommandExecutor::CommandExecutor(GuiTab* _tab)
+				:tab(_tab)
+			{
+			}
+
+			GuiTab::CommandExecutor::~CommandExecutor()
+			{
+			}
+
+			void GuiTab::CommandExecutor::ShowTab(vint index, bool setFocus)
+			{
+				tab->SetSelectedPage(tab->GetPages().Get(index));
+				if (setFocus)
+				{
+					tab->SetFocus();
+				}
+			}
+
+/***********************************************************************
 GuiTab
 ***********************************************************************/
 
@@ -108,18 +130,50 @@ GuiTab
 				ct->SetSelectedTabPage(selectedPage);
 			}
 
-			GuiTab::CommandExecutor::CommandExecutor(GuiTab* _tab)
-				:tab(_tab)
+			void GuiTab::OnKeyDown(compositions::GuiGraphicsComposition* sender, compositions::GuiKeyEventArgs& arguments)
 			{
-			}
+				if (arguments.eventSource == focusableComposition)
+				{
+					if (auto ct = GetControlTemplateObject(false))
+					{
+						vint index = tabPages.IndexOf(selectedPage);
+						if (index != -1)
+						{
+							auto hint = ct->GetTabOrder();
+							vint tabOffset = 0;
+							switch (hint)
+							{
+							case TabPageOrder::LeftToRight:
+								if (arguments.code == VKEY::_LEFT) tabOffset = -1;
+								else if (arguments.code == VKEY::_RIGHT) tabOffset = 1;
+								break;
+							case TabPageOrder::RightToLeft:
+								if (arguments.code == VKEY::_LEFT) tabOffset = 1;
+								else if (arguments.code == VKEY::_RIGHT) tabOffset = -1;
+								break;
+							case TabPageOrder::TopToBottom:
+								if (arguments.code == VKEY::_UP) tabOffset = -1;
+								else if (arguments.code == VKEY::_DOWN) tabOffset = 1;
+								break;
+							case TabPageOrder::BottomToTop:
+								if (arguments.code == VKEY::_UP) tabOffset = 1;
+								else if (arguments.code == VKEY::_DOWN) tabOffset = -1;
+								break;
+							default:;
+							}
 
-			GuiTab::CommandExecutor::~CommandExecutor()
-			{
-			}
+							if (tabOffset != 0)
+							{
+								arguments.handled = true;
+								index += tabOffset;
+								if (index < 0) index = 0;
+								else if (index >= tabPages.Count()) index = tabPages.Count() - 1;
 
-			void GuiTab::CommandExecutor::ShowTab(vint index)
-			{
-				tab->SetSelectedPage(tab->GetPages().Get(index));
+								SetSelectedPage(tabPages[index]);
+							}
+						}
+					}
+				}
 			}
 
 			GuiTab::GuiTab(theme::ThemeName themeName)
@@ -127,6 +181,9 @@ GuiTab
 				, tabPages(this)
 			{
 				commandExecutor = new CommandExecutor(this);
+				SetFocusableComposition(boundsComposition);
+
+				boundsComposition->GetEventReceiver()->keyDown.AttachMethod(this, &GuiTab::OnKeyDown);
 			}
 
 			GuiTab::~GuiTab()
@@ -219,6 +276,12 @@ GuiScrollView
 				CalculateView();
 			}
 
+			void GuiScrollView::UpdateDisplayFont()
+			{
+				GuiControl::UpdateDisplayFont();
+				CalculateView();
+			}
+
 			void GuiScrollView::OnContainerBoundsChanged(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments)
 			{
 				InvokeOrDelayIfRendering([=]()
@@ -249,10 +312,13 @@ GuiScrollView
 				{
 					if (auto scroll = GetControlTemplateObject(true)->GetHorizontalScroll())
 					{
-						vint position = scroll->GetPosition();
-						vint move = scroll->GetSmallMove();
-						position -= move * arguments.wheel / 60;
-						scroll->SetPosition(position);
+						if (scroll->GetEnabled())
+						{
+							vint position = scroll->GetPosition();
+							vint move = scroll->GetSmallMove();
+							position -= move * arguments.wheel / 60;
+							scroll->SetPosition(position);
+						}
 					}
 				}
 			}
@@ -263,10 +329,13 @@ GuiScrollView
 				{
 					if (auto scroll = GetControlTemplateObject(true)->GetVerticalScroll())
 					{
-						vint position = scroll->GetPosition();
-						vint move = scroll->GetSmallMove();
-						position -= move * arguments.wheel / 60;
-						scroll->SetPosition(position);
+						if (scroll->GetEnabled())
+						{
+							vint position = scroll->GetPosition();
+							vint move = scroll->GetSmallMove();
+							position -= move * arguments.wheel / 60;
+							scroll->SetPosition(position);
+						}
 					}
 				}
 			}
@@ -334,7 +403,7 @@ GuiScrollView
 
 			vint GuiScrollView::GetSmallMove()
 			{
-				return GetFont().size * 2;
+				return GetDisplayFont().size * 2;
 			}
 
 			Size GuiScrollView::GetBigMove()
@@ -344,12 +413,6 @@ GuiScrollView
 			
 			GuiScrollView::~GuiScrollView()
 			{
-			}
-
-			void GuiScrollView::SetFont(const FontProperties& value)
-			{
-				GuiControl::SetFont(value);
-				CalculateView();
 			}
 
 			void GuiScrollView::CalculateView()

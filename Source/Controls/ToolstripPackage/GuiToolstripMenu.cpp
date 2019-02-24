@@ -1,5 +1,8 @@
 #include "GuiToolstripMenu.h"
 #include "../Templates/GuiThemeStyleFactory.h"
+#include "../../GraphicsComposition/GuiGraphicsStackComposition.h"
+#include "../../GraphicsComposition/GuiGraphicsSharedSizeComposition.h"
+#include "../../GraphicsHost/GuiGraphicsHost_ShortcutKey.h"
 
 namespace vl
 {
@@ -229,6 +232,19 @@ GuiToolstripButton
 				callback = _callback;
 			}
 
+			void GuiToolstripButton::OnActiveAlt()
+			{
+				auto host = GetSubMenuHost();
+				if (host == this)
+				{
+					GuiMenuButton::OnActiveAlt();
+				}
+				else
+				{
+					host->QueryTypedService<IGuiAltAction>()->OnActiveAlt();
+				}
+			}
+
 			void GuiToolstripButton::UpdateCommandContent()
 			{
 				if(command)
@@ -283,6 +299,7 @@ GuiToolstripButton
 				:GuiMenuButton(themeName)
 				,command(0)
 			{
+				SetAutoFocus(false);
 				Clicked.AttachMethod(this, &GuiToolstripButton::OnClicked);
 				TextChanged.AttachMethod(this, &GuiToolstripButton::OnLayoutAwaredPropertyChanged);
 				ShortcutTextChanged.AttachMethod(this, &GuiToolstripButton::OnLayoutAwaredPropertyChanged);

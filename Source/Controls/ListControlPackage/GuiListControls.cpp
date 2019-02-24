@@ -1,5 +1,6 @@
 #include "GuiListControls.h"
 #include "../Templates/GuiControlTemplates.h"
+#include "../../GraphicsHost/GuiGraphicsHost.h"
 
 namespace vl
 {
@@ -157,7 +158,7 @@ GuiListControl
 
 			void GuiListControl::OnStyleInstalled(vint itemIndex, ItemStyle* style)
 			{
-				style->SetFont(GetFont());
+				style->SetFont(GetDisplayFont());
 				style->SetContext(GetContext());
 				style->SetText(itemProvider->GetTextValue(itemIndex));
 				style->SetVisuallyEnabled(GetVisuallyEnabled());
@@ -204,7 +205,7 @@ GuiListControl
 			{
 				if(GetVisuallyEnabled())
 				{
-					boundsComposition->GetRelatedGraphicsHost()->SetFocus(boundsComposition);
+					SetFocus();
 				}
 			}
 
@@ -239,6 +240,15 @@ GuiListControl
 				CalculateView();
 			}
 
+			void GuiListControl::UpdateDisplayFont()
+			{
+				GuiControl::UpdateDisplayFont();
+				FOREACH(ItemStyle*, style, visibleStyles.Keys())
+				{
+					style->SetFont(GetDisplayFont());
+				}
+			}
+
 			void GuiListControl::OnClientBoundsChanged(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments)
 			{
 				auto args = GetNotifyEventArguments();
@@ -250,14 +260,6 @@ GuiListControl
 				FOREACH(ItemStyle*, style, visibleStyles.Keys())
 				{
 					style->SetVisuallyEnabled(GetVisuallyEnabled());
-				}
-			}
-
-			void GuiListControl::OnFontChanged(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments)
-			{
-				FOREACH(ItemStyle*, style, visibleStyles.Keys())
-				{
-					style->SetFont(GetFont());
 				}
 			}
 
@@ -378,7 +380,6 @@ GuiListControl
 				:GuiScrollView(themeName)
 				, itemProvider(_itemProvider)
 			{
-				FontChanged.AttachMethod(this, &GuiListControl::OnFontChanged);
 				ContextChanged.AttachMethod(this, &GuiListControl::OnContextChanged);
 				VisuallyEnabledChanged.AttachMethod(this, &GuiListControl::OnVisuallyEnabledChanged);
 				containerComposition->BoundsChanged.AttachMethod(this, &GuiListControl::OnClientBoundsChanged);
@@ -471,7 +472,24 @@ GuiListControl
 				{
 					return false;
 				}
-				return itemArranger ? itemArranger->EnsureItemVisible(itemIndex) : false;
+
+				if (!itemArranger) return false;
+				auto result = itemArranger->EnsureItemVisible(itemIndex);
+				if (result == EnsureItemVisibleResult::Moved)
+				{
+					if (auto host = GetBoundsComposition()->GetRelatedGraphicsHost())
+					{
+						auto flag = GetDisposedFlag();
+						host->InvokeAfterRendering([=]()
+						{
+							if (!flag->IsDisposed())
+							{
+								EnsureItemVisible(itemIndex);
+							}
+						}, { this,0 });
+					}
+				}
+				return result != EnsureItemVisibleResult::ItemNotExists;
 			}
 
 			Size GuiListControl::GetAdoptedSize(Size expectedSize)
@@ -570,13 +588,13 @@ GuiSelectableListControl
 
 			void GuiSelectableListControl::NormalizeSelectedItemIndexStartEnd()
 			{
-				if(selectedItemIndexStart<0 || selectedItemIndexStart>=itemProvider->Count())
+				if (selectedItemIndexStart < 0 || selectedItemIndexStart >= itemProvider->Count())
 				{
-					selectedItemIndexStart=0;
+					selectedItemIndexStart = 0;
 				}
-				if(selectedItemIndexEnd<0 || selectedItemIndexEnd>=itemProvider->Count())
+				if (selectedItemIndexEnd < 0 || selectedItemIndexEnd >= itemProvider->Count())
 				{
-					selectedItemIndexEnd=0;
+					selectedItemIndexEnd = 0;
 				}
 			}
 
@@ -621,14 +639,14 @@ GuiSelectableListControl
 
 			GuiSelectableListControl::GuiSelectableListControl(theme::ThemeName themeName, IItemProvider* _itemProvider)
 				:GuiListControl(themeName, _itemProvider, true)
-				,multiSelect(false)
-				,selectedItemIndexStart(-1)
-				,selectedItemIndexEnd(-1)
+				, multiSelect(false)
+				, selectedItemIndexStart(-1)
+				, selectedItemIndexEnd(-1)
 			{
 				SelectionChanged.SetAssociatedComposition(boundsComposition);
 				ItemLeftButtonDown.AttachMethod(this, &GuiSelectableListControl::OnItemLeftButtonDown);
 				ItemRightButtonDown.AttachMethod(this, &GuiSelectableListControl::OnItemRightButtonDown);
-				if(focusableComposition)
+				if (focusableComposition)
 				{
 					focusableComposition->GetEventReceiver()->keyDown.AttachMethod(this, &GuiSelectableListControl::OnKeyDown);
 				}
@@ -706,36 +724,36 @@ GuiSelectableListControl
 			bool GuiSelectableListControl::SelectItemsByClick(vint itemIndex, bool ctrl, bool shift, bool leftButton)
 			{
 				NormalizeSelectedItemIndexStartEnd();
-				if(0<=itemIndex && itemIndex<itemProvider->Count())
+				if (0 <= itemIndex && itemIndex < itemProvider->Count())
 				{
-					if(!leftButton)
+					if (!leftButton)
 					{
-						if(selectedItems.Contains(itemIndex))
+						if (selectedItems.Contains(itemIndex))
 						{
 							return true;
 						}
 					}
-					if(!multiSelect)
+					if (!multiSelect)
 					{
-						shift=false;
-						ctrl=false;
+						shift = false;
+						ctrl = false;
 					}
-					if(shift)
+					if (shift)
 					{
-						if(!ctrl)
+						if (!ctrl)
 						{
 							SetMultipleItemsSelectedSilently(selectedItemIndexStart, selectedItemIndexEnd, false);
 						}
-						selectedItemIndexEnd=itemIndex;
+						selectedItemIndexEnd = itemIndex;
 						SetMultipleItemsSelectedSilently(selectedItemIndexStart, selectedItemIndexEnd, true);
 						NotifySelectionChanged();
 					}
 					else
 					{
-						if(ctrl)
+						if (ctrl)
 						{
-							vint index=selectedItems.IndexOf(itemIndex);
-							if(index==-1)
+							vint index = selectedItems.IndexOf(itemIndex);
+							if (index == -1)
 							{
 								selectedItems.Add(itemIndex);
 							}
@@ -743,7 +761,7 @@ GuiSelectableListControl
 							{
 								selectedItems.RemoveAt(index);
 							}
-							OnItemSelectionChanged(itemIndex, index==-1);
+							OnItemSelectionChanged(itemIndex, index == -1);
 							NotifySelectionChanged();
 						}
 						else
@@ -754,56 +772,56 @@ GuiSelectableListControl
 							OnItemSelectionChanged(itemIndex, true);
 							NotifySelectionChanged();
 						}
-						selectedItemIndexStart=itemIndex;
-						selectedItemIndexEnd=itemIndex;
+						selectedItemIndexStart = itemIndex;
+						selectedItemIndexEnd = itemIndex;
 					}
 					return true;
 				}
 				return false;
 			}
 
-			bool GuiSelectableListControl::SelectItemsByKey(vint code, bool ctrl, bool shift)
+			bool GuiSelectableListControl::SelectItemsByKey(VKEY code, bool ctrl, bool shift)
 			{
-				if(!GetArranger()) return false;
+				if (!GetArranger()) return false;
 
 				NormalizeSelectedItemIndexStartEnd();
-				KeyDirection keyDirection=KeyDirection::Up;
-				switch(code)
+				KeyDirection keyDirection = KeyDirection::Up;
+				switch (code)
 				{
-				case VKEY_UP:
-					keyDirection=KeyDirection::Up;
+				case VKEY::_UP:
+					keyDirection = KeyDirection::Up;
 					break;
-				case VKEY_DOWN:
-					keyDirection=KeyDirection::Down;
+				case VKEY::_DOWN:
+					keyDirection = KeyDirection::Down;
 					break;
-				case VKEY_LEFT:
-					keyDirection=KeyDirection::Left;
+				case VKEY::_LEFT:
+					keyDirection = KeyDirection::Left;
 					break;
-				case VKEY_RIGHT:
-					keyDirection=KeyDirection::Right;
+				case VKEY::_RIGHT:
+					keyDirection = KeyDirection::Right;
 					break;
-				case VKEY_HOME:
-					keyDirection=KeyDirection::Home;
+				case VKEY::_HOME:
+					keyDirection = KeyDirection::Home;
 					break;
-				case VKEY_END:
-					keyDirection=KeyDirection::End;
+				case VKEY::_END:
+					keyDirection = KeyDirection::End;
 					break;
-				case VKEY_PRIOR:
-					keyDirection=KeyDirection::PageUp;
+				case VKEY::_PRIOR:
+					keyDirection = KeyDirection::PageUp;
 					break;
-				case VKEY_NEXT:
-					keyDirection=KeyDirection::PageDown;
+				case VKEY::_NEXT:
+					keyDirection = KeyDirection::PageDown;
 					break;
 				default:
 					return false;
 				}
 
-				if(GetAxis())
+				if (GetAxis())
 				{
-					keyDirection=GetAxis()->RealKeyDirectionToVirtualKeyDirection(keyDirection);
+					keyDirection = GetAxis()->RealKeyDirectionToVirtualKeyDirection(keyDirection);
 				}
-				vint itemIndex=GetArranger()->FindItem(selectedItemIndexEnd, keyDirection);
-				if(SelectItemsByClick(itemIndex, ctrl, shift, true))
+				vint itemIndex = GetArranger()->FindItem(selectedItemIndexEnd, keyDirection);
+				if (SelectItemsByClick(itemIndex, ctrl, shift, true))
 				{
 					return EnsureItemVisible(itemIndex);
 				}
@@ -832,10 +850,13 @@ ItemProviderBase
 
 				void ItemProviderBase::InvokeOnItemModified(vint start, vint count, vint newCount)
 				{
+					CHECK_ERROR(!callingOnItemModified, L"ItemProviderBase::InvokeOnItemModified(vint, vint, vint)#Canning modify the observable data source during its item modified event, which will cause this event to be executed recursively.");
+					callingOnItemModified = true;
 					for (vint i = 0; i < callbacks.Count(); i++)
 					{
 						callbacks[i]->OnItemModified(start, count, newCount);
 					}
+					callingOnItemModified = false;
 				}
 
 				ItemProviderBase::ItemProviderBase()

@@ -534,6 +534,31 @@ Workflow_GenerateInstanceClass
 				return block;
 			};
 
+			auto getDefaultType = [&](const WString& className)->Tuple<Ptr<ITypeInfo>, WString>
+			{
+				auto paramTd = GetTypeDescriptor(className);
+				if (!paramTd)
+				{
+					auto source = FindInstanceLoadingSource(resolvingResult.context, {}, className);
+					if (auto typeInfo = GetInstanceLoaderManager()->GetTypeInfoForType(source.typeName))
+					{
+						paramTd = typeInfo->GetTypeDescriptor();
+					}
+				}
+
+				if (paramTd)
+				{
+					auto typeInfo = Workflow_GetSuggestedParameterType(paramTd);
+					switch (typeInfo->GetDecorator())
+					{
+					case ITypeInfo::RawPtr: return { typeInfo,className + L"*" };
+					case ITypeInfo::SharedPtr: return { typeInfo,className + L"^" };
+					default: return { typeInfo,className };
+					}
+				}
+				return { nullptr,className };
+			};
+
 			///////////////////////////////////////////////////////////////
 			// ref.Members
 			///////////////////////////////////////////////////////////////
@@ -569,7 +594,30 @@ Workflow_GenerateInstanceClass
 
 			if (baseWfType)
 			{
-				// Fill later
+				auto call = MakePtr<WfBaseConstructorCall>();
+				ctor->baseConstructorCalls.Add(call);
+				call->type = CopyType(instanceClass->baseTypes[0]);
+				baseTypeContext = baseTypeResourceItem->GetContent().Cast<GuiInstanceContext>();
+
+				FOREACH(Ptr<GuiInstanceParameter>, parameter, baseTypeContext->parameters)
+				{
+					auto parameterTypeInfoTuple = getDefaultType(parameter->className.ToString());
+					auto expression = Workflow_ParseExpression(
+						precompileContext,
+						parameter->classPosition.originalLocation,
+						L"cast("+parameterTypeInfoTuple.f1+L") (null of object)",
+						parameter->classPosition,
+						errors,
+						{ 0,5 }
+						);
+					if (!expression)
+					{
+						auto nullExpr = MakePtr<WfLiteralExpression>();
+						nullExpr->value = WfLiteralValue::Null;
+						expression = nullExpr;
+					}
+					call->arguments.Add(expression);
+				}
 			}
 			else if (auto group = baseType->GetTypeDescriptor()->GetConstructorGroup())
 			{
@@ -604,19 +652,72 @@ Workflow_GenerateInstanceClass
 
 			FOREACH(Ptr<GuiInstanceLocalized>, localized, context->localizeds)
 			{
-				if (auto type = GetTypeDescriptor(localized->interfaceName))
+				if (auto lsTd = GetTypeDescriptor(localized->className.ToString()))
 				{
-					auto prop = MakePtr<WfAutoPropertyDeclaration>();
-					addDecl(prop);
+					ITypeDescriptor* lsiTd = nullptr;
+					if (auto group = lsTd->GetMethodGroupByName(L"Get", false))
+					{
+						vint count = group->GetMethodCount();
+						for (vint i = 0; i < count; i++)
+						{
+							auto method = group->GetMethod(i);
+							if (method->GetParameterCount() == 1)
+							{
+								auto paramTd = method->GetParameter(0)->GetType()->GetTypeDescriptor();
+								if (paramTd == description::GetTypeDescriptor<Locale>())
+								{
+									lsiTd = method->GetReturn()->GetTypeDescriptor();
+									break;
+								}
+							}
+						}
+					}
 
-					prop->name.value = localized->name.ToString();
-					prop->type = GetTypeFromTypeInfo(Workflow_GetSuggestedParameterType(type).Obj());
-					prop->configConst = WfAPConst::Writable;
-					prop->configObserve = WfAPObserve::Observable;
+					if (lsiTd)
+					{
+						auto prop = MakePtr<WfAutoPropertyDeclaration>();
+						addDecl(prop);
 
-					auto nullExpr = MakePtr<WfLiteralExpression>();
-					nullExpr->value = WfLiteralValue::Null;
-					prop->expression = nullExpr;
+						prop->name.value = localized->name.ToString();
+						prop->type = GetTypeFromTypeInfo(Workflow_GetSuggestedParameterType(lsiTd).Obj());
+						prop->configConst = WfAPConst::Writable;
+						prop->configObserve = WfAPObserve::Observable;
+
+						auto localeNameExpr = MakePtr<WfStringExpression>();
+						localeNameExpr->value.value = L"en-US";
+
+						auto defaultLocalExpr = MakePtr<WfTypeCastingExpression>();
+						defaultLocalExpr->strategy = WfTypeCastingStrategy::Strong;
+						defaultLocalExpr->type = GetTypeFromTypeInfo(TypeInfoRetriver<Locale>::CreateTypeInfo().Obj());
+						defaultLocalExpr->expression = localeNameExpr;
+
+						auto getExpr = MakePtr<WfChildExpression>();
+						getExpr->parent = GetExpressionFromTypeDescriptor(lsTd);
+						getExpr->name.value = L"Get";
+
+						auto callExpr = MakePtr<WfCallExpression>();
+						callExpr->function = getExpr;
+						callExpr->arguments.Add(defaultLocalExpr);
+						prop->expression = callExpr;
+					}
+					else
+					{
+						errors.Add(GuiResourceError({ resolvingResult.resource }, localized->classPosition,
+							L"Precompile: Class \"" +
+							localized->className.ToString() +
+							L"\" of localized strings \"" +
+							localized->name.ToString() +
+							L"\" is not a correct localized strings class."));
+					}
+				}
+				else
+				{
+					errors.Add(GuiResourceError({ resolvingResult.resource }, localized->classPosition,
+						L"Precompile: Class \"" +
+						localized->className.ToString() +
+						L"\" of localized strings \"" +
+						localized->name.ToString() +
+						L"\" cannot be found."));
 				}
 			}
 
@@ -626,34 +727,11 @@ Workflow_GenerateInstanceClass
 
 			FOREACH(Ptr<GuiInstanceParameter>, parameter, context->parameters)
 			{
-				WString classNameTail;
-				Ptr<ITypeInfo> parameterTypeInfo;
-				{
-					auto paramTd = GetTypeDescriptor(parameter->className.ToString());
-					if (!paramTd)
-					{
-						auto source = FindInstanceLoadingSource(resolvingResult.context, {}, parameter->className.ToString());
-						if (auto typeInfo = GetInstanceLoaderManager()->GetTypeInfoForType(source.typeName))
-						{
-							paramTd = typeInfo->GetTypeDescriptor();
-						}
-					}
-
-					if (paramTd)
-					{
-						parameterTypeInfo = Workflow_GetSuggestedParameterType(paramTd);
-						switch (parameterTypeInfo->GetDecorator())
-						{
-						case ITypeInfo::RawPtr: classNameTail = L"*"; break;
-						case ITypeInfo::SharedPtr: classNameTail = L"^"; break;
-						default:;
-						}
-					}
-				}
-
+				auto parameterTypeInfoTuple = getDefaultType(parameter->className.ToString());
 				vint errorCount = errors.Count();
-				auto type = Workflow_ParseType(precompileContext, { resolvingResult.resource }, parameter->className.ToString() + classNameTail, parameter->classPosition, errors);
-				if (!needFunctionBody && !parameterTypeInfo && errorCount == errors.Count())
+				auto type = Workflow_ParseType(precompileContext, { resolvingResult.resource }, parameterTypeInfoTuple.f1, parameter->classPosition, errors);
+
+				if (!needFunctionBody && !parameterTypeInfoTuple.f0 && errorCount == errors.Count())
 				{
 					if (!type || type.Cast<WfReferenceType>() || type.Cast<WfChildType>() || type.Cast<WfTopQualifiedType>())
 					{
@@ -669,7 +747,7 @@ Workflow_GenerateInstanceClass
 
 						decl->name.value = L"<parameter>" + parameter->name.ToString();
 						decl->type = CopyType(type);
-						decl->expression = CreateDefaultValue(parameterTypeInfo.Obj());
+						decl->expression = CreateDefaultValue(parameterTypeInfoTuple.f0.Obj());
 
 						Workflow_RecordScriptPosition(precompileContext, parameter->tagPosition, (Ptr<WfDeclaration>)decl);
 					}

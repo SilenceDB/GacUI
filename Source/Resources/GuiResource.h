@@ -20,8 +20,6 @@ namespace vl
 
 	namespace presentation
 	{
-		using namespace reflection;
-
 		class GuiResourceItem;
 		class GuiResourceFolder;
 		class GuiResource;
@@ -292,6 +290,7 @@ Resource Structure
 
 			typedef collections::List<DelayLoading>								DelayLoadingList;
 
+			WString									importUri;
 			ItemMap									items;
 			FolderMap								folders;
 
@@ -301,11 +300,19 @@ Resource Structure
 			void									LoadResourceFolderFromBinary(DelayLoadingList& delayLoadings, stream::internal::ContextFreeReader& reader, collections::List<WString>& typeNames, GuiResourceError::List& errors);
 			void									SaveResourceFolderToBinary(stream::internal::ContextFreeWriter& writer, collections::List<WString>& typeNames);
 			void									PrecompileResourceFolder(GuiResourcePrecompileContext& context, IGuiResourcePrecompileCallback* callback, GuiResourceError::List& errors);
-			void									InitializeResourceFolder(GuiResourceInitializeContext& context);
+			void									InitializeResourceFolder(GuiResourceInitializeContext& context, GuiResourceError::List& errors);
+			void									ImportFromUri(const WString& uri, GuiResourceTextPos position, GuiResourceError::List& errors);
 		public:
 			/// <summary>Create a resource folder.</summary>
 			GuiResourceFolder();
 			~GuiResourceFolder();
+
+			///<summary>Get the import uri for this folder.</summary>
+			///<returns>The import uri for this folder. Returns an empty string for non-import folders</returns>
+			const WString&							GetImportUri();
+			///<summary>Set the import uri for this folder.</summary>
+			///<param name="uri">The import uri for this folder. Set an empty string for non-import folders</param>
+			void									SetImportUri(const WString& uri);
 
 			/// <summary>Get all sub items.</summary>
 			/// <returns>All sub items.</returns>
@@ -370,18 +377,37 @@ Resource
 			DataOnly,
 			InstanceClass,
 		};
+
+		/// <summary>Resource metadata.</summary>
+		class GuiResourceMetadata : public Object
+		{
+		public:
+			WString									name;
+			WString									version;
+			collections::List<WString>				dependencies;
+
+			void									LoadFromXml(Ptr<parsing::xml::XmlDocument> xml, GuiResourceLocation location, GuiResourceError::List& errors);
+			Ptr<parsing::xml::XmlDocument>			SaveToXml();
+		};
 		
 		/// <summary>Resource. A resource is a root resource folder that does not have a name.</summary>
 		class GuiResource : public GuiResourceFolder, public Description<GuiResource>
 		{
 		protected:
 			WString									workingDirectory;
+			Ptr<GuiResourceMetadata>				metadata;
 
 			static void								ProcessDelayLoading(Ptr<GuiResource> resource, DelayLoadingList& delayLoadings, GuiResourceError::List& errors);
 		public:
+			static const wchar_t*					CurrentVersionString;
+
 			/// <summary>Create a resource.</summary>
 			GuiResource();
 			~GuiResource();
+
+			/// <summary>Get the metadata of the resource.</summary>
+			/// <returns>The metadata.</returns>
+			Ptr<GuiResourceMetadata>				GetMetadata();
 
 			/// <summary>Get the directory where the resource is load.</summary>
 			/// <returns>The directory.</returns>
@@ -428,7 +454,8 @@ Resource
 
 			/// <summary>Initialize a precompiled resource.</summary>
 			/// <param name="usage">In which role an application is initializing this resource.</param>
-			void									Initialize(GuiResourceUsage usage);
+			/// <param name="errors">All collected errors during initializing a resource.</param>
+			void									Initialize(GuiResourceUsage usage, GuiResourceError::List& errors);
 			
 			/// <summary>Get a contained document model using a path like "Packages\Application\Name". If the path does not exists or the type does not match, an exception will be thrown.</summary>
 			/// <returns>The containd resource object.</returns>
@@ -647,7 +674,8 @@ Resource Type Resolver
 			/// <summary>Initialize the resource item.</summary>
 			/// <param name="resource">The resource to initializer.</param>
 			/// <param name="context">The context for initializing.</param>
-			virtual void										Initialize(Ptr<GuiResourceItem> resource, GuiResourceInitializeContext& context) = 0;
+			/// <param name="errors">All collected errors during initializing a resource.</param>
+			virtual void										Initialize(Ptr<GuiResourceItem> resource, GuiResourceInitializeContext& context, GuiResourceError::List& errors) = 0;
 		};
 
 		/// <summary>Represents a symbol type for loading a resource without a preload type.</summary>
@@ -759,9 +787,6 @@ Resource Resolver Manager
 		};
 		
 		extern IGuiResourceResolverManager*						GetResourceResolverManager();
-		extern vint												CopyStream(stream::IStream& inputStream, stream::IStream& outputStream);
-		extern void												CompressStream(stream::IStream& inputStream, stream::IStream& outputStream);
-		extern void												DecompressStream(stream::IStream& inputStream, stream::IStream& outputStream);
 		extern void												DecompressStream(const char** buffer, bool compress, vint rows, vint block, vint remain, stream::IStream& outputStream);
 	}
 }

@@ -64,16 +64,19 @@ Tab Control
 				{
 				protected:
 					GuiTab*										tab;
+
 				public:
 					CommandExecutor(GuiTab* _tab);
 					~CommandExecutor();
 
-					void										ShowTab(vint index)override;
+					void										ShowTab(vint index, bool setFocus)override;
 				};
 
 				Ptr<CommandExecutor>							commandExecutor;
 				GuiTabPageList									tabPages;
 				GuiTabPage*										selectedPage = nullptr;
+
+				void											OnKeyDown(compositions::GuiGraphicsComposition* sender, compositions::GuiKeyEventArgs& arguments);
 			public:
 				/// <summary>Create a control with a specified default theme.</summary>
 				/// <param name="themeName">The theme name for retriving a default control template.</param>
@@ -116,6 +119,8 @@ Scroll View
 				bool									horizontalAlwaysVisible = true;
 				bool									verticalAlwaysVisible = true;
 
+				void									UpdateDisplayFont()override;
+
 				void									OnContainerBoundsChanged(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments);
 				void									OnHorizontalScroll(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments);
 				void									OnVerticalScroll(compositions::GuiGraphicsComposition* sender, compositions::GuiEventArgs& arguments);
@@ -142,8 +147,6 @@ Scroll View
 				/// <param name="themeName">The theme name for retriving a default control template.</param>
 				GuiScrollView(theme::ThemeName themeName);
 				~GuiScrollView();
-
-				virtual void							SetFont(const FontProperties& value)override;
 
 				/// <summary>Force to update contents and scroll bars.</summary>
 				void									CalculateView();

@@ -34,11 +34,17 @@ Type List (Basic)
 			F(presentation::AxisDirection)\
 			F(presentation::TextPos)\
 			F(presentation::GridPos)\
+			F(presentation::NativeCoordinate)\
 			F(presentation::Point)\
+			F(presentation::NativePoint)\
 			F(presentation::Size)\
+			F(presentation::NativeSize)\
 			F(presentation::Rect)\
+			F(presentation::NativeRect)\
 			F(presentation::Margin)\
+			F(presentation::NativeMargin)\
 			F(presentation::FontProperties)\
+			F(presentation::VKEY)\
 			F(presentation::GlobalStringKey)\
 			F(presentation::INativeImageFrame)\
 			F(presentation::INativeImage)\
@@ -53,6 +59,8 @@ Type List (Basic)
 			F(presentation::INativeImageService)\
 			F(presentation::INativeResourceService)\
 			F(presentation::INativeAsyncService)\
+			F(presentation::INativeClipboardReader)\
+			F(presentation::INativeClipboardWriter)\
 			F(presentation::INativeClipboardService)\
 			F(presentation::INativeScreenService)\
 			F(presentation::INativeInputService)\
@@ -112,6 +120,7 @@ Type List (Elements)
 			F(presentation::elements::text::ColorEntry)\
 
 #define GUIREFLECTIONELEMENT_CLASS_TYPELIST(F)\
+			F(presentation::elements::GuiFocusRectangleElement)\
 			F(presentation::elements::GuiSolidBorderElement)\
 			F(presentation::elements::Gui3DBorderElement)\
 			F(presentation::elements::Gui3DSplitterElement)\
@@ -152,6 +161,7 @@ Type List (Compositions)
 			F(presentation::compositions::IGuiAltAction)\
 			F(presentation::compositions::IGuiAltActionContainer)\
 			F(presentation::compositions::IGuiAltActionHost)\
+			F(presentation::compositions::IGuiTabAction)\
 
 #define GUIREFLECTIONCOMPOSITION_CLASS_TYPELIST(F)\
 			F(presentation::compositions::GuiGraphicsComposition)\
@@ -196,6 +206,8 @@ Type List (Events)
 			F(presentation::compositions::GuiKeyEventArgs)\
 			F(presentation::compositions::GuiCharEventArgs)\
 			F(presentation::compositions::GuiMouseEventArgs)\
+			F(presentation::compositions::ControlSignal)\
+			F(presentation::compositions::GuiControlSignalEventArgs)\
 			F(presentation::compositions::GuiItemEventArgs)\
 			F(presentation::compositions::GuiItemMouseEventArgs)\
 			F(presentation::compositions::GuiNodeEventArgs)\
@@ -208,9 +220,9 @@ Type List (Templates)
 #define GUIREFLECTIONTEMPLATES_EXTRA_TYPELIST(F)\
 			F(presentation::controls::ButtonState)\
 			F(presentation::controls::ColumnSortingState)\
+			F(presentation::controls::TabPageOrder)\
 			F(presentation::templates::BoolOption)\
 			F(presentation::controls::ITextBoxCommandExecutor)\
-			F(presentation::controls::IComboBoxCommandExecutor)\
 			F(presentation::controls::IScrollCommandExecutor)\
 			F(presentation::controls::ITabCommandExecutor)\
 			F(presentation::controls::IDatePickerCommandExecutor)\
@@ -233,6 +245,7 @@ Type List (Templates)
 			F(presentation::controls::list::MainColumnVisualizerTemplate)\
 			F(presentation::controls::list::SubColumnVisualizerTemplate)\
 			F(presentation::controls::list::HyperlinkVisualizerTemplate)\
+			F(presentation::controls::list::FocusRectangleVisualizerTemplate)\
 			F(presentation::controls::list::CellBorderVisualizerTemplate)\
 
 #define GUIREFLECTIONTEMPLATES_TYPELIST(F)\
@@ -260,9 +273,11 @@ Type List (Controls)
 			F(presentation::controls::GuiListControl::IItemProviderCallback)\
 			F(presentation::controls::GuiListControl::IItemArrangerCallback)\
 			F(presentation::controls::GuiListControl::IItemProvider)\
+			F(presentation::controls::GuiListControl::EnsureItemVisibleResult)\
 			F(presentation::controls::GuiListControl::IItemArranger)\
 			F(presentation::controls::list::ItemProviderBase)\
 			F(presentation::controls::list::RangedItemArrangerBase)\
+			F(presentation::controls::list::FreeHeightItemArranger)\
 			F(presentation::controls::list::FixedHeightItemArranger)\
 			F(presentation::controls::list::FixedSizeMultiColumnItemArranger)\
 			F(presentation::controls::list::FixedHeightMultiColumnItemArranger)\
@@ -326,6 +341,7 @@ Type List (Controls)
 			F(presentation::controls::list::DataProvider)\
 
 #define GUIREFLECTIONCONTROLS_CLASS_TYPELIST(F)\
+			F(presentation::controls::GuiDisposedFlag)\
 			F(presentation::controls::GuiControl)\
 			F(presentation::controls::GuiCustomControl)\
 			F(presentation::controls::GuiLabel)\
@@ -774,7 +790,7 @@ Interface Proxy (Controls)
 					INVOKEGET_INTERFACE_PROXY(FindItem, itemIndex, key);
 				}
 
-				bool EnsureItemVisible(vint itemIndex)override
+				presentation::controls::GuiListControl::EnsureItemVisibleResult EnsureItemVisible(vint itemIndex)override
 				{
 					INVOKEGET_INTERFACE_PROXY(EnsureItemVisible, itemIndex);
 				}
